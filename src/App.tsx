@@ -8,6 +8,7 @@ import { MainLayout } from "@/components/MainLayout";
 import Home from "./pages/Home";
 import ModulePage from "./pages/ModulePage";
 import LessonPage from "./pages/LessonPage";
+import DashboardPage from "./pages/DashboardPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
               <Route path="/" element={<Home />} />
               <Route path="/module/:moduleId" element={<ModulePage />} />
               <Route path="/module/:moduleId/lesson/:lessonId" element={<LessonPage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

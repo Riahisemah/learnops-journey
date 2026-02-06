@@ -11,12 +11,18 @@ import {
   Circle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getModuleById, getLessonById, LessonType, modules } from "@/data/course-data";
+import { getQuizByLesson } from "@/data/quiz-data";
+import { getVideoByLesson } from "@/data/video-data";
+import { getLessonContent } from "@/data/lesson-content";
 import { useProgress } from "@/hooks/use-progress";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import VideoPlayer from "@/components/lesson/VideoPlayer";
+import QuizSystem from "@/components/lesson/QuizSystem";
+import MarkdownViewer from "@/components/lesson/MarkdownViewer";
+import MLDashboard from "@/components/lesson/MLDashboard";
 
 const lessonTypeConfig: Record<LessonType, { icon: React.ComponentType<{ className?: string }>; label: string; color: string }> = {
   video: { icon: Video, label: 'Vidéo', color: 'text-info' },
@@ -50,14 +56,20 @@ const LessonPage = () => {
   const typeConfig = lessonTypeConfig[lesson.type];
   const TypeIcon = typeConfig.icon;
   
+  // Content data
+  const quiz = getQuizByLesson(module.id, lesson.id);
+  const video = getVideoByLesson(module.id, lesson.id);
+  const lessonContent = getLessonContent(module.id, lesson.id);
+  
   // Navigation
   const lessonIndex = module.lessons.findIndex(l => l.id === lesson.id);
   const prevLesson = module.lessons[lessonIndex - 1];
   const nextLesson = module.lessons[lessonIndex + 1];
-  
-  // If no next lesson, check for next module
   const currentModuleIndex = modules.findIndex(m => m.id === module.id);
   const nextModule = modules[currentModuleIndex + 1];
+
+  // Check if this is the monitoring lesson (show ML dashboard)
+  const showMLDashboard = lesson.id === 'monitoring' || lesson.id === 'project-recap';
 
   const handleToggleComplete = () => {
     if (completed) {
@@ -65,14 +77,24 @@ const LessonPage = () => {
       toast.info("Leçon marquée comme non terminée");
     } else {
       completeLesson(module.id, lesson.id);
-      
-      // Check if badge was just earned
       const hadBadge = hasBadge(module.id);
       setTimeout(() => {
         if (!hadBadge && hasBadge(module.id)) {
           toast.success(`🏆 Félicitations ! Badge "${module.title}" obtenu !`);
         } else {
           toast.success("Leçon terminée !");
+        }
+      }, 100);
+    }
+  };
+
+  const handleQuizComplete = () => {
+    if (!completed) {
+      completeLesson(module.id, lesson.id);
+      const hadBadge = hasBadge(module.id);
+      setTimeout(() => {
+        if (!hadBadge && hasBadge(module.id)) {
+          toast.success(`🏆 Badge "${module.title}" obtenu !`);
         }
       }, 100);
     }
@@ -121,64 +143,118 @@ const LessonPage = () => {
         </div>
       </header>
 
-      {/* Content Placeholder */}
+      {/* Content */}
       <section className="py-8 px-6">
         <div className="max-w-4xl mx-auto">
-          <Card className="min-h-[400px] flex items-center justify-center">
-            <CardContent className="text-center py-16">
-              <TypeIcon className={cn("h-16 w-16 mx-auto mb-4 opacity-50", typeConfig.color)} />
-              <h2 className="text-xl font-semibold mb-2">Contenu de la leçon</h2>
+          {/* Video lessons */}
+          {lesson.type === 'video' && video && (
+            <VideoPlayer
+              video={video}
+              completed={completed}
+              onMarkWatched={handleToggleComplete}
+            />
+          )}
+
+          {/* Quiz lessons */}
+          {lesson.type === 'quiz' && quiz && (
+            <QuizSystem
+              quiz={quiz}
+              onComplete={handleQuizComplete}
+              completed={completed}
+            />
+          )}
+
+          {/* Text lessons with markdown viewer */}
+          {lesson.type === 'text' && lessonContent && (
+            <MarkdownViewer
+              theory={lessonContent.theory}
+              practice={lessonContent.practice}
+            />
+          )}
+
+          {/* Practice lessons */}
+          {lesson.type === 'practice' && (
+            <div className="space-y-6">
+              {lessonContent && (
+                <MarkdownViewer
+                  theory={lessonContent.theory}
+                  practice={lessonContent.practice}
+                />
+              )}
+              
+              {showMLDashboard && (
+                <MLDashboard />
+              )}
+
+              {!lessonContent && !showMLDashboard && (
+                <div className="text-center py-16 bg-card rounded-lg border border-border">
+                  <Code className={cn("h-16 w-16 mx-auto mb-4 opacity-50", typeConfig.color)} />
+                  <h2 className="text-xl font-semibold mb-2">Exercice pratique</h2>
+                  <p className="text-muted-foreground max-w-md mx-auto">
+                    Le contenu de cet exercice sera ajouté prochainement.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Fallback for lessons without specific content */}
+          {lesson.type === 'video' && !video && (
+            <div className="text-center py-16 bg-card rounded-lg border border-border">
+              <Video className="h-16 w-16 mx-auto mb-4 opacity-50 text-info" />
+              <h2 className="text-xl font-semibold mb-2">Vidéo à venir</h2>
               <p className="text-muted-foreground max-w-md mx-auto">
-                Le contenu de cette leçon sera ajouté prochainement. 
-                Pour l'instant, vous pouvez marquer cette leçon comme terminée pour tester la progression.
+                La vidéo sera disponible prochainement.
               </p>
-              
-              {lesson.type === 'video' && (
-                <div className="mt-6 p-8 bg-secondary rounded-lg">
-                  <Video className="h-12 w-12 mx-auto text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground mt-2">Emplacement vidéo</p>
-                </div>
-              )}
-              
-              {lesson.type === 'quiz' && (
-                <div className="mt-6 p-8 bg-secondary rounded-lg">
-                  <HelpCircle className="h-12 w-12 mx-auto text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground mt-2">Questions du quiz</p>
-                </div>
-              )}
-              
-              {lesson.type === 'practice' && (
-                <div className="mt-6 p-8 bg-secondary rounded-lg font-mono text-sm text-left">
-                  <Code className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground text-center">Zone de code interactif</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            </div>
+          )}
+
+          {lesson.type === 'text' && !lessonContent && (
+            <div className="text-center py-16 bg-card rounded-lg border border-border">
+              <FileText className="h-16 w-16 mx-auto mb-4 opacity-50 text-primary" />
+              <h2 className="text-xl font-semibold mb-2">Contenu à venir</h2>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Le contenu de cette leçon sera ajouté prochainement.
+              </p>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <Button
-              variant={completed ? "outline" : "default"}
-              size="lg"
-              onClick={handleToggleComplete}
-              className={cn(
-                "gap-2 w-full sm:w-auto",
-                !completed && "bg-accent hover:bg-accent/90 text-accent-foreground"
-              )}
-            >
-              {completed ? (
-                <>
-                  <CheckCircle2 className="h-5 w-5 text-accent" />
-                  Terminée - Cliquer pour annuler
-                </>
-              ) : (
-                <>
-                  <Circle className="h-5 w-5" />
-                  Marquer comme terminée
-                </>
-              )}
-            </Button>
+            {lesson.type !== 'quiz' && (
+              <Button
+                variant={completed ? "outline" : "default"}
+                size="lg"
+                onClick={handleToggleComplete}
+                className={cn(
+                  "gap-2 w-full sm:w-auto",
+                  !completed && "bg-accent hover:bg-accent/90 text-accent-foreground"
+                )}
+              >
+                {completed ? (
+                  <>
+                    <CheckCircle2 className="h-5 w-5 text-accent" />
+                    Terminée - Cliquer pour annuler
+                  </>
+                ) : (
+                  <>
+                    <Circle className="h-5 w-5" />
+                    Marquer comme terminée
+                  </>
+                )}
+              </Button>
+            )}
+
+            {lesson.type === 'quiz' && (
+              <div className="w-full sm:w-auto">
+                {completed && (
+                  <Badge variant="outline" className="gap-1 text-accent border-accent">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Quiz complété
+                  </Badge>
+                )}
+              </div>
+            )}
 
             <div className="flex gap-2 w-full sm:w-auto">
               {prevLesson && (

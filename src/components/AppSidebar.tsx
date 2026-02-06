@@ -9,7 +9,8 @@ import {
   Trophy,
   BookOpen,
   Menu,
-  X
+  X,
+  BarChart3
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -59,6 +60,20 @@ function SidebarContentInner({ onNavigate }: SidebarContentProps) {
         >
           <Home className="h-5 w-5" />
           <span>Accueil</span>
+        </Link>
+
+        <Link
+          to="/dashboard"
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors",
+            location.pathname === "/dashboard" 
+              ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+              : "hover:bg-sidebar-accent/50"
+          )}
+        >
+          <BarChart3 className="h-5 w-5" />
+          <span>Tableau de bord</span>
         </Link>
 
         <div className="pt-4">
