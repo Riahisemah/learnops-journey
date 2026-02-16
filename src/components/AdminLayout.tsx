@@ -57,10 +57,10 @@ function AdminNav({ onNavigate }: { onNavigate?: () => void }) {
       <div className="p-4 border-t border-sidebar-border space-y-2">
         <div className="flex items-center gap-2 text-sm">
           <div className="h-8 w-8 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold text-xs">
-            {user?.firstName?.[0]}{user?.lastName?.[0]}
+            {user?.first_name?.[0]}{user?.last_name?.[0]}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-medium truncate">{user?.firstName} {user?.lastName}</p>
+            <p className="font-medium truncate">{user?.first_name} {user?.last_name}</p>
             <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
           </div>
         </div>

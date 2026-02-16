@@ -32,12 +32,12 @@ export default function AdminUsers() {
   const [editTarget, setEditTarget] = useState<User | null>(null);
 
   // Add user form state
-  const [formData, setFormData] = useState({ firstName: "", lastName: "", email: "", password: "", role: "student" as User["role"] });
+  const [formData, setFormData] = useState({ first_name: "", last_name: "", email: "", password: "", role: "student" as User["role"] });
 
-  const resetForm = () => setFormData({ firstName: "", lastName: "", email: "", password: "", role: "student" });
+  const resetForm = () => setFormData({ first_name: "", last_name: "", email: "", password: "", role: "student" });
 
   const filtered = users.filter(u => {
-    const matchSearch = `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = `${u.first_name} ${u.last_name} ${u.email}`.toLowerCase().includes(search.toLowerCase());
     const matchRole = roleFilter === "all" || u.role === roleFilter;
     return matchSearch && matchRole;
   });
@@ -45,7 +45,7 @@ export default function AdminUsers() {
   const exportCSV = () => {
     const headers = "Nom,Email,Rôle,Progression,Statut,Dernière connexion\n";
     const rows = users.map(u =>
-      `${u.firstName} ${u.lastName},${u.email},${roleLabel[u.role]},${u.progression}%,${u.status},${new Date(u.lastLogin).toLocaleDateString("fr-FR")}`
+      `${u.first_name} ${u.last_name},${u.email},${roleLabel[u.role]},${u.progression}%,${u.status},${new Date(u.lastLogin).toLocaleDateString("fr-FR")}`
     ).join("\n");
     const blob = new Blob([headers + rows], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -56,7 +56,7 @@ export default function AdminUsers() {
   };
 
   const handleAddUser = () => {
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
+    if (!formData.first_name || !formData.last_name || !formData.email || !formData.password) {
       toast.error("Veuillez remplir tous les champs");
       return;
     }
@@ -65,8 +65,8 @@ export default function AdminUsers() {
       return;
     }
     addUser({
-      firstName: formData.firstName,
-      lastName: formData.lastName,
+      first_name: formData.first_name,
+      last_name: formData.last_name,
       email: formData.email.toLowerCase(),
       password: formData.password,
       role: formData.role,
@@ -84,8 +84,8 @@ export default function AdminUsers() {
   const handleEditUser = () => {
     if (!editTarget) return;
     updateUserById(editTarget.id, {
-      firstName: formData.firstName,
-      lastName: formData.lastName,
+      first_name: formData.first_name,
+      last_name: formData.last_name,
       email: formData.email.toLowerCase(),
       role: formData.role,
     });
@@ -95,14 +95,14 @@ export default function AdminUsers() {
   };
 
   const openEdit = (u: User) => {
-    setFormData({ firstName: u.firstName, lastName: u.lastName, email: u.email, password: "", role: u.role });
+    setFormData({ first_name: u.first_name, last_name: u.last_name, email: u.email, password: "", role: u.role });
     setEditTarget(u);
   };
 
   const handleToggleBlock = (u: User) => {
     const newStatus = u.status === "active" ? "blocked" : "active";
     updateUserById(u.id, { status: newStatus });
-    toast.success(newStatus === "blocked" ? `${u.firstName} a été bloqué` : `${u.firstName} a été débloqué`);
+    toast.success(newStatus === "blocked" ? `${u.first_name} a été bloqué` : `${u.first_name} a été débloqué`);
   };
 
   const handleDelete = () => {
@@ -165,10 +165,10 @@ export default function AdminUsers() {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full bg-accent/20 flex items-center justify-center text-xs font-bold text-accent">
-                        {u.firstName[0]}{u.lastName[0]}
+                        {u.first_name[0]}{u.last_name[0]}
                       </div>
                       <div>
-                        <p className="font-medium text-sm">{u.firstName} {u.lastName}</p>
+                        <p className="font-medium text-sm">{u.first_name} {u.last_name}</p>
                         <p className="text-xs text-muted-foreground">{u.email}</p>
                       </div>
                     </div>
@@ -221,12 +221,12 @@ export default function AdminUsers() {
           {selectedUser && (
             <>
               <DialogHeader>
-                <DialogTitle>{selectedUser.firstName} {selectedUser.lastName}</DialogTitle>
+                <DialogTitle>{selectedUser.first_name} {selectedUser.last_name}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="h-12 w-12 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold">
-                    {selectedUser.firstName[0]}{selectedUser.lastName[0]}
+                    {selectedUser.first_name[0]}{selectedUser.last_name[0]}
                   </div>
                   <div>
                     <p className="font-medium">{selectedUser.email}</p>
@@ -269,11 +269,11 @@ export default function AdminUsers() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Prénom</Label>
-                <Input value={formData.firstName} onChange={e => setFormData(p => ({ ...p, firstName: e.target.value }))} />
+                <Input value={formData.first_name} onChange={e => setFormData(p => ({ ...p, first_name: e.target.value }))} />
               </div>
               <div className="space-y-2">
                 <Label>Nom</Label>
-                <Input value={formData.lastName} onChange={e => setFormData(p => ({ ...p, lastName: e.target.value }))} />
+                <Input value={formData.last_name} onChange={e => setFormData(p => ({ ...p, last_name: e.target.value }))} />
               </div>
             </div>
             <div className="space-y-2">
@@ -311,11 +311,11 @@ export default function AdminUsers() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Prénom</Label>
-                <Input value={formData.firstName} onChange={e => setFormData(p => ({ ...p, firstName: e.target.value }))} />
+                <Input value={formData.first_name} onChange={e => setFormData(p => ({ ...p, first_name: e.target.value }))} />
               </div>
               <div className="space-y-2">
                 <Label>Nom</Label>
-                <Input value={formData.lastName} onChange={e => setFormData(p => ({ ...p, lastName: e.target.value }))} />
+                <Input value={formData.last_name} onChange={e => setFormData(p => ({ ...p, last_name: e.target.value }))} />
               </div>
             </div>
             <div className="space-y-2">
@@ -345,7 +345,7 @@ export default function AdminUsers() {
       <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Confirmer la suppression</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">Supprimer {deleteTarget?.firstName} {deleteTarget?.lastName} ? Cette action est irréversible.</p>
+          <p className="text-sm text-muted-foreground">Supprimer {deleteTarget?.first_name} {deleteTarget?.last_name} ? Cette action est irréversible.</p>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>Annuler</Button>
             <Button variant="destructive" onClick={handleDelete}>Supprimer</Button>

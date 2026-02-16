@@ -1,4 +1,4 @@
-﻿version: '3.8'
+version: '3.8'
 
 services:
   db:
@@ -13,7 +13,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U devops_user"]
+      test: ["CMD-SHELL", "pg_isready -U devops_user -d didacticiel_db"]  # Added database name
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,7 +26,7 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://devops_user:devops_password@db:5432/didacticiel_db
-      SECRET_KEY: super-secret-key-change-in-production-min-32-characters
+      SECRET_KEY: super-secret-key-change-in-production-min-32-characters-long
       FRONTEND_URL: http://localhost:5173
       DEBUG: "True"
     volumes:

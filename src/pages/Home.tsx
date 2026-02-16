@@ -14,9 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { modules, getTotalLessons, getTotalDuration } from "@/data/course-data";
 import { useProgress } from "@/hooks/use-progress";
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
+import { moduleService } from "@/services/moduleService";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   GitBranch,
@@ -34,10 +35,39 @@ const Home = () => {
     hasBadge
   } = useProgress();
 
-  const totalLessons = getTotalLessons();
-  const totalMinutes = getTotalDuration();
+  const [modules, setModules] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchModules = async () => {
+      try {
+        const data = await moduleService.getAll();
+        setModules(data);
+      } catch (error) {
+        console.error('Error fetching modules:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchModules();
+  }, []);
+
+  // Calculer les totaux à partir des modules
+  const totalLessons = modules.reduce((acc, module) => acc + (module.lessons?.length || 0), 0);
+  const totalMinutes = modules.reduce((acc, module) => acc + (module.total_duration || 0), 0);
   const totalHours = Math.floor(totalMinutes / 60);
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Chargement du parcours...</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen animate-fade-in">
       {/* Hero Section */}

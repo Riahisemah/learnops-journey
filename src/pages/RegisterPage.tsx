@@ -24,8 +24,8 @@ const strengthLabels = ["Très faible", "Faible", "Moyen", "Bon", "Fort"];
 const strengthColors = ["bg-destructive", "bg-destructive", "bg-warning", "bg-info", "bg-accent"];
 
 export default function RegisterPage() {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [first_name, setfirst_name] = useState("");
+  const [last_name, setlast_name] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -46,7 +46,7 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!firstName || !lastName || !email || !password || !confirmPassword) {
+    if (!first_name || !last_name || !email || !password || !confirmPassword) {
       setError("Veuillez remplir tous les champs");
       return;
     }
@@ -62,7 +62,7 @@ export default function RegisterPage() {
       setError("Vous devez accepter les conditions d'utilisation");
       return;
     }
-    const result = await register({ firstName, lastName, email, password, role });
+    const result = await register({ first_name, last_name, email, password, role });
     if (result.success) {
       navigate("/");
     } else {
@@ -92,12 +92,12 @@ export default function RegisterPage() {
               )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">Prénom</Label>
-                  <Input id="firstName" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Marie" />
+                  <Label htmlFor="first_name">Prénom</Label>
+                  <Input id="first_name" value={first_name} onChange={e => setfirst_name(e.target.value)} placeholder="Marie" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Nom</Label>
-                  <Input id="lastName" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Dupont" />
+                  <Label htmlFor="last_name">Nom</Label>
+                  <Input id="last_name" value={last_name} onChange={e => setlast_name(e.target.value)} placeholder="Dupont" />
                 </div>
               </div>
               <div className="space-y-2">

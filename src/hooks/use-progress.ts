@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { modules } from '@/data/course-data';
+import { useAuth } from '@/contexts/AuthContext';
+import { moduleService } from '@/services/moduleService';
+import { lessonService } from '@/services/lessonService';
 
 interface ProgressState {
   completedLessons: string[]; // Array of "moduleId:lessonId"
@@ -9,25 +11,72 @@ interface ProgressState {
 
 const STORAGE_KEY = 'devops-mlops-progress';
 
-const getInitialState = (): ProgressState => {
-  if (typeof window === 'undefined') {
-    return { completedLessons: [], earnedBadges: [], startedAt: null };
-  }
-  
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch {
-      return { completedLessons: [], earnedBadges: [], startedAt: null };
-    }
-  }
-  return { completedLessons: [], earnedBadges: [], startedAt: null };
-};
-
 export const useProgress = () => {
-  const [progress, setProgress] = useState<ProgressState>(getInitialState);
+  const { user } = useAuth();
+  const [progress, setProgress] = useState<ProgressState>({
+    completedLessons: [],
+    earnedBadges: [],
+    startedAt: null
+  });
+  const [modules, setModules] = useState<any[]>([]);
 
+  // Charger les modules depuis l'API
+  useEffect(() => {
+    const loadModules = async () => {
+      try {
+        const data = await moduleService.getAll();
+        setModules(data);
+      } catch (error) {
+        console.error('Error loading modules:', error);
+      }
+    };
+    loadModules();
+  }, []);
+
+  // Charger la progression
+  useEffect(() => {
+    const loadProgress = async () => {
+      if (!user) {
+        // Fallback au localStorage si pas d'utilisateur
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          try {
+            setProgress(JSON.parse(stored));
+          } catch {
+            setProgress({ completedLessons: [], earnedBadges: [], startedAt: null });
+          }
+        }
+        return;
+      }
+
+      try {
+        const modules = await moduleService.getAll();
+        
+        // Convertir la progression API en format local
+        const completedLessons: string[] = [];
+        const earnedBadges: string[] = modules
+          .filter(m => m.completion_rate === 100)
+          .map(m => m.id);
+
+        setProgress({
+          completedLessons,
+          earnedBadges,
+          startedAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        console.error('Error loading progress:', error);
+        // Fallback au localStorage
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          setProgress(JSON.parse(stored));
+        }
+      }
+    };
+
+    loadProgress();
+  }, [user]);
+
+  // Sauvegarder dans localStorage à chaque changement
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
   }, [progress]);
@@ -36,61 +85,62 @@ export const useProgress = () => {
     return progress.completedLessons.includes(`${moduleId}:${lessonId}`);
   }, [progress.completedLessons]);
 
-  const completeLesson = useCallback((moduleId: string, lessonId: string) => {
-    setProgress(prev => {
-      const lessonKey = `${moduleId}:${lessonId}`;
-      if (prev.completedLessons.includes(lessonKey)) {
-        return prev;
+  const completeLesson = useCallback(async (moduleId: string, lessonId: string) => {
+    const lessonKey = `${moduleId}:${lessonId}`;
+    
+    if (progress.completedLessons.includes(lessonKey)) {
+      return;
+    }
+
+    const newCompletedLessons = [...progress.completedLessons, lessonKey];
+    
+    // Vérifier si le module est complet
+    const module = modules.find(m => m.id === moduleId);
+    const moduleComplete = module?.lessons?.every((lesson: any) => 
+      newCompletedLessons.includes(`${moduleId}:${lesson.id}`)
+    );
+
+    const newBadges = moduleComplete && !progress.earnedBadges.includes(moduleId)
+      ? [...progress.earnedBadges, moduleId]
+      : progress.earnedBadges;
+
+    const newProgress = {
+      completedLessons: newCompletedLessons,
+      earnedBadges: newBadges,
+      startedAt: progress.startedAt || new Date().toISOString(),
+    };
+
+    setProgress(newProgress);
+
+    // Envoyer à l'API si utilisateur connecté
+    if (user) {
+      try {
+        await lessonService.completeLesson(lessonId);
+      } catch (error) {
+        console.error('Error syncing lesson completion:', error);
       }
-
-      const newCompletedLessons = [...prev.completedLessons, lessonKey];
-      
-      // Check if module is now complete
-      const module = modules.find(m => m.id === moduleId);
-      const moduleComplete = module?.lessons.every(lesson => 
-        newCompletedLessons.includes(`${moduleId}:${lesson.id}`)
-      );
-
-      const newBadges = moduleComplete && !prev.earnedBadges.includes(moduleId)
-        ? [...prev.earnedBadges, moduleId]
-        : prev.earnedBadges;
-
-      return {
-        completedLessons: newCompletedLessons,
-        earnedBadges: newBadges,
-        startedAt: prev.startedAt || new Date().toISOString(),
-      };
-    });
-  }, []);
-
-  const uncompleteLesson = useCallback((moduleId: string, lessonId: string) => {
-    setProgress(prev => {
-      const lessonKey = `${moduleId}:${lessonId}`;
-      return {
-        ...prev,
-        completedLessons: prev.completedLessons.filter(key => key !== lessonKey),
-        // Remove badge if module is no longer complete
-        earnedBadges: prev.earnedBadges.filter(id => id !== moduleId),
-      };
-    });
-  }, []);
+    }
+  }, [progress, modules, user]);
 
   const getModuleProgress = useCallback((moduleId: string): number => {
     const module = modules.find(m => m.id === moduleId);
-    if (!module) return 0;
+    if (!module || !module.lessons) return 0;
 
     const completedInModule = progress.completedLessons.filter(key => 
       key.startsWith(`${moduleId}:`)
     ).length;
 
     return Math.round((completedInModule / module.lessons.length) * 100);
-  }, [progress.completedLessons]);
+  }, [progress.completedLessons, modules]);
 
   const getOverallProgress = useCallback((): number => {
-    const totalLessons = modules.reduce((acc, m) => acc + m.lessons.length, 0);
+    if (modules.length === 0) return 0;
+    
+    const totalLessons = modules.reduce((acc, m) => acc + (m.lessons?.length || 0), 0);
     if (totalLessons === 0) return 0;
+    
     return Math.round((progress.completedLessons.length / totalLessons) * 100);
-  }, [progress.completedLessons]);
+  }, [progress.completedLessons, modules]);
 
   const getCompletedLessonsCount = useCallback((): number => {
     return progress.completedLessons.length;
@@ -111,7 +161,6 @@ export const useProgress = () => {
   return {
     isLessonCompleted,
     completeLesson,
-    uncompleteLesson,
     getModuleProgress,
     getOverallProgress,
     getCompletedLessonsCount,
@@ -120,4 +169,4 @@ export const useProgress = () => {
     resetProgress,
     startedAt: progress.startedAt,
   };
-};
+}

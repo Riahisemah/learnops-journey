@@ -25,7 +25,10 @@ export const API_CONFIG = {
     },
     LESSONS: {
       LIST: (moduleId: string) => `/api/modules/${moduleId}/lessons`,
-      COMPLETE: (id: string) => `/api/lessons/${id}/complete`,
+      GET: (moduleId: string, lessonId: string) => `/api/modules/${moduleId}/lessons/${lessonId}`,
+      CONTENT: (moduleId: string, lessonId: string) => `/api/modules/${moduleId}/lessons/${lessonId}/content`,
+      COMPLETE: (lessonId: string) => `/api/lessons/${lessonId}/complete`,
+      PROGRESS: (lessonId: string) => `/api/lessons/${lessonId}/progress`,
     },
     QUIZ: {
       GET: (id: string) => `/api/quizzes/${id}`,

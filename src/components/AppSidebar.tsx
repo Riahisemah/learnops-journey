@@ -99,10 +99,10 @@ function SidebarContentInner({ onNavigate }: SidebarContentProps) {
         {user && (
           <div className="flex items-center gap-2 pt-2 border-t border-sidebar-border">
             <div className="h-8 w-8 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold text-xs">
-              {user.firstName[0]}{user.lastName[0]}
+              {user.first_name[0]}{user.last_name[0]}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{user.firstName} {user.lastName}</p>
+              <p className="text-sm font-medium truncate">{user.first_name} {user.last_name}</p>
               <p className="text-xs text-muted-foreground truncate">{user.email}</p>
             </div>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowLogout(true)}>

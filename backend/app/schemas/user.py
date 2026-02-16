@@ -1,7 +1,12 @@
-﻿from pydantic import BaseModel, EmailStr, constr
-from typing import Optional, List
+from pydantic import BaseModel, EmailStr, constr
+from typing import Optional
 from datetime import datetime
-from app.core.permissions import UserRole
+from enum import Enum
+
+class UserRole(str, Enum):
+    STUDENT = "student"
+    INSTRUCTOR = "instructor"
+    ADMIN = "admin"
 
 class UserBase(BaseModel):
     email: EmailStr
@@ -27,11 +32,7 @@ class UserResponse(UserBase):
     class Config:
         from_attributes = True
 
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-
 class Token(BaseModel):
     access_token: str
-    token_type: str = "bearer"
+    token_type: str
     user: UserResponse

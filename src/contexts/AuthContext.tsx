@@ -1,24 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { mockUsers, type User } from "@/data/mock-users";
+import type { User } from "@/data/mock-users";
+import { API_CONFIG } from "@/config/api";
 
 interface AuthContextType {
   user: User | null;
-  users: User[];
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
-  updateUser: (data: Partial<User>) => void;
-  updateUserById: (id: string, data: Partial<User>) => void;
-  deleteUser: (id: string) => void;
-  addUser: (data: Omit<User, "id" | "createdAt" | "lastLogin">) => void;
-  getAllUsers: () => User[];
 }
 
 export interface RegisterData {
-  firstName: string;
-  lastName: string;
+  first_name: string;
+  last_name: string;
   email: string;
   password: string;
   role: "student" | "instructor" | "admin";
@@ -26,147 +21,181 @@ export interface RegisterData {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const USERS_KEY = "devops-mlops-users";
-const CURRENT_USER_KEY = "devops-mlops-current-user";
+const TOKEN_KEY = "auth-token";
 
-function getStoredUsers(): User[] {
-  const stored = localStorage.getItem(USERS_KEY);
-  if (stored) {
-    try { return JSON.parse(stored); } catch { /* fallthrough */ }
+/* ---------------------------------------------------- */
+/* Helper: Fetch with Auth Header */
+/* ---------------------------------------------------- */
+async function apiFetch(endpoint: string, options: RequestInit = {}) {
+  const token = localStorage.getItem(TOKEN_KEY);
+
+  const res = await fetch(`${API_CONFIG.BASE_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
+    },
+  });
+
+  // Handle empty responses
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!res.ok) {
+    throw new Error(data?.detail || "API Error");
   }
-  localStorage.setItem(USERS_KEY, JSON.stringify(mockUsers));
-  return [...mockUsers];
+
+  return data;
 }
 
+/* ---------------------------------------------------- */
+/* Provider */
+/* ---------------------------------------------------- */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [users, setUsers] = useState<User[]>(getStoredUsers);
-  const [user, setUser] = useState<User | null>(() => {
-    const stored = localStorage.getItem(CURRENT_USER_KEY);
-    if (stored) {
-      try { return JSON.parse(stored); } catch { /* fallthrough */ }
-    }
-    return null;
-  });
-  const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
+  /* ---------------------------------------------------- */
+  /* Load user on app start */
+  /* ---------------------------------------------------- */
   useEffect(() => {
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-  }, [users]);
+    const loadUser = async () => {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
 
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
-    } else {
-      localStorage.removeItem(CURRENT_USER_KEY);
-    }
-  }, [user]);
+      try {
+        const data = await apiFetch(API_CONFIG.ENDPOINTS.AUTH.ME);
+        setUser(data);
+      } catch {
+        localStorage.removeItem(TOKEN_KEY);
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
+    loadUser();
+  }, []);
+
+  /* ---------------------------------------------------- */
+  /* Login - FIXED for OAuth2PasswordRequestForm */
+  /* ---------------------------------------------------- */
   const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
-    await new Promise(r => setTimeout(r, 600));
-    const found = users.find(u => u.email === email.toLowerCase());
-    if (!found) {
-      setIsLoading(false);
-      return { success: false, error: "Aucun compte trouvé avec cet email" };
-    }
-    if (found.password !== password) {
-      setIsLoading(false);
-      return { success: false, error: "Mot de passe incorrect" };
-    }
-    if (found.status === "blocked") {
-      setIsLoading(false);
-      return { success: false, error: "Ce compte a été bloqué" };
-    }
-    const updated = { ...found, lastLogin: new Date().toISOString() };
-    setUsers(prev => prev.map(u => u.id === found.id ? updated : u));
-    setUser(updated);
-    setIsLoading(false);
-    return { success: true };
-  }, [users]);
+    try {
+      // OAuth2PasswordRequestForm expects form-urlencoded with 'username' field
+      const formData = new URLSearchParams();
+      formData.append('username', email);  // Must be 'username', not 'email'
+      formData.append('password', password);
 
+      const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.AUTH.LOGIN}`, {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Login failed");
+      }
+
+      // The response includes access_token, token_type, and user
+      localStorage.setItem(TOKEN_KEY, data.access_token);
+      setUser(data.user);
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('Login error:', error);
+      return { success: false, error: error.message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  /* ---------------------------------------------------- */
+  /* Register - FIXED with proper data transformation */
+  /* ---------------------------------------------------- */
   const register = useCallback(async (data: RegisterData) => {
     setIsLoading(true);
-    await new Promise(r => setTimeout(r, 600));
-    const exists = users.find(u => u.email === data.email.toLowerCase());
-    if (exists) {
+    try {
+      // Transform camelCase to snake_case as expected by backend
+      const backendData = {
+        email: data.email,
+        password: data.password,
+        first_name: data.first_name,  // Transform
+        last_name: data.last_name,     // Transform
+        role: data.role               // Already correct format
+      };
+
+      console.log('Sending registration data:', backendData);
+
+      // Register the user - endpoint returns UserResponse, not Token
+      const userData = await apiFetch(API_CONFIG.ENDPOINTS.AUTH.REGISTER, {
+        method: "POST",
+        body: JSON.stringify(backendData),
+      });
+
+      console.log('Registration successful:', userData);
+
+      // Automatically log in after successful registration
+      const loginResult = await login(data.email, data.password);
+      
+      if (!loginResult.success) {
+        return { success: false, error: "Registration succeeded but auto-login failed. Please try logging in manually." };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      return { success: false, error: error.message };
+    } finally {
       setIsLoading(false);
-      return { success: false, error: "Un compte existe déjà avec cet email" };
     }
-    const newUser: User = {
-      id: crypto.randomUUID(),
-      firstName: data.firstName,
-      lastName: data.lastName,
-      email: data.email.toLowerCase(),
-      password: data.password,
-      role: data.role,
-      status: "active",
-      createdAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString(),
-      progression: 0,
-      modulesCompleted: [],
-      badges: [],
-      avatar: "",
-    };
-    setUsers(prev => [...prev, newUser]);
-    setUser(newUser);
-    setIsLoading(false);
-    return { success: true };
-  }, [users]);
+  }, [login]);
 
-  const logout = useCallback(() => {
-    setUser(null);
+  /* ---------------------------------------------------- */
+  /* Logout */
+  /* ---------------------------------------------------- */
+  const logout = useCallback(async () => {
+    try {
+      // Your backend might not have a logout endpoint
+      await apiFetch(API_CONFIG.ENDPOINTS.AUTH.LOGOUT, {
+        method: "POST",
+      }).catch(() => {
+        // Ignore errors if endpoint doesn't exist
+      });
+    } finally {
+      localStorage.removeItem(TOKEN_KEY);
+      setUser(null);
+    }
   }, []);
-
-  const updateUser = useCallback((data: Partial<User>) => {
-    setUser(prev => {
-      if (!prev) return null;
-      const updated = { ...prev, ...data };
-      setUsers(us => us.map(u => u.id === prev.id ? updated : u));
-      return updated;
-    });
-  }, []);
-
-  const updateUserById = useCallback((id: string, data: Partial<User>) => {
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, ...data } : u));
-  }, []);
-
-  const deleteUser = useCallback((id: string) => {
-    setUsers(prev => prev.filter(u => u.id !== id));
-    if (user?.id === id) setUser(null);
-  }, [user]);
-
-  const addUser = useCallback((data: Omit<User, "id" | "createdAt" | "lastLogin">) => {
-    const newUser: User = {
-      ...data,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString(),
-    };
-    setUsers(prev => [...prev, newUser]);
-  }, []);
-
-  const getAllUsers = useCallback(() => users, [users]);
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      users,
-      isAuthenticated: !!user,
-      isLoading,
-      login,
-      register,
-      logout,
-      updateUser,
-      updateUserById,
-      deleteUser,
-      addUser,
-      getAllUsers,
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated: !!user,
+        isLoading,
+        login,
+        register,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
 
+/* ---------------------------------------------------- */
+/* Hook */
+/* ---------------------------------------------------- */
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");

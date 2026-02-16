@@ -15,7 +15,7 @@ export default function AdminAnalytics() {
   }));
 
   const topUsers = [...students].sort((a, b) => b.progression - a.progression).slice(0, 10).map(u => ({
-    name: `${u.firstName} ${u.lastName[0]}.`,
+    name: `${u.first_name} ${u.last_name[0]}.`,
     progression: u.progression,
   }));
 
