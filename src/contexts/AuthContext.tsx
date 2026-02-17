@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { mockUsers, type User } from "@/data/mock-users";
-import { authService, type LoginCredentials, type RegisterData as ApiRegisterData } from "@/services/authService";
+import { authService, type RegisterData as ApiRegisterData } from "@/services/authService";
 import { userService } from "@/services/userService";
-import { adminService } from "@/services/adminService";
 
 interface AuthContextType {
   user: User | null;
+  users: User[];
   isAuthenticated: boolean;
   isLoading: boolean;
   isBackendAvailable: boolean;
@@ -43,7 +43,6 @@ function getStoredUsers(): User[] {
   return [...mockUsers];
 }
 
-// Helper to check if backend is reachable
 async function checkBackend(): Promise<boolean> {
   try {
     const response = await fetch(
@@ -56,12 +55,11 @@ async function checkBackend(): Promise<boolean> {
   }
 }
 
-// Map API user to local User type
 function mapApiUserToLocal(apiUser: any): User {
   return {
     id: apiUser.id,
-    firstName: apiUser.first_name || apiUser.firstName || "",
-    lastName: apiUser.last_name || apiUser.lastName || "",
+    first_name: apiUser.first_name || "",
+    last_name: apiUser.last_name || "",
     email: apiUser.email,
     password: "",
     role: apiUser.role || "student",
@@ -110,42 +108,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then(apiUser => {
         const mapped = mapApiUserToLocal(apiUser);
         setUser(mapped);
+        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(mapped));
       })
       .catch(() => {
-        // Token expired or invalid — keep localStorage user
         localStorage.removeItem("access_token");
       });
   }, [isBackendAvailable]);
 
+  // Persist users to localStorage
   useEffect(() => {
-    const loadUser = async () => {
-      const token = localStorage.getItem(TOKEN_KEY);
-      if (!token) {
-        setIsLoading(false);
-        return;
-      }
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  }, [users]);
 
-      try {
-        const data = await apiFetch(API_CONFIG.ENDPOINTS.AUTH.ME);
-        setUser(data);
-      } catch {
-        localStorage.removeItem(TOKEN_KEY);
-        setUser(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Persist current user to localStorage
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(CURRENT_USER_KEY);
+    }
+  }, [user]);
 
-    loadUser();
-  }, []);
-
-  /* ---------------------------------------------------- */
-  /* Login - FIXED for OAuth2PasswordRequestForm */
-  /* ---------------------------------------------------- */
   const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
 
-    // Try API first if backend is available
     if (isBackendAvailable) {
       try {
         const response = await authService.login({ email, password });
@@ -155,12 +141,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: true };
       } catch (error: any) {
         const detail = error?.response?.data?.detail;
-        // If it's a real auth error from the backend, don't fallback
         if (error?.response?.status === 401 || error?.response?.status === 400) {
           setIsLoading(false);
           return { success: false, error: detail || "Identifiants incorrects" };
         }
-        // Network error — fall through to localStorage
         console.warn("Backend login failed, falling back to localStorage");
       }
     }
@@ -190,18 +174,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = useCallback(async (data: RegisterData) => {
     setIsLoading(true);
 
-    // Try API first
     if (isBackendAvailable) {
       try {
         const apiData: ApiRegisterData = {
           email: data.email,
           password: data.password,
-          first_name: data.firstName,
-          last_name: data.lastName,
+          first_name: data.first_name,
+          last_name: data.last_name,
           role: data.role,
         };
         await authService.register(apiData);
-        // Auto-login after registration
         const loginResponse = await authService.login({ email: data.email, password: data.password });
         const mapped = mapApiUserToLocal(loginResponse.user);
         setUser(mapped);
@@ -226,8 +208,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const newUser: User = {
       id: crypto.randomUUID(),
-      firstName: data.firstName,
-      lastName: data.lastName,
+      first_name: data.first_name,
+      last_name: data.last_name,
       email: data.email.toLowerCase(),
       password: data.password,
       role: data.role,
@@ -249,6 +231,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     localStorage.removeItem("access_token");
     localStorage.removeItem("user");
+    localStorage.removeItem(CURRENT_USER_KEY);
   }, []);
 
   const updateUser = useCallback((data: Partial<User>) => {
@@ -257,11 +240,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const updated = { ...prev, ...data };
       setUsers(us => us.map(u => u.id === prev.id ? updated : u));
 
-      // Try API update in background
       if (localStorage.getItem(BACKEND_STATUS_KEY) === "true") {
         userService.update(prev.id, {
-          first_name: updated.firstName,
-          last_name: updated.lastName,
+          first_name: updated.first_name,
+          last_name: updated.last_name,
           avatar: updated.avatar,
         }).catch(() => {});
       }
@@ -275,8 +257,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (localStorage.getItem(BACKEND_STATUS_KEY) === "true") {
       userService.update(id, {
-        first_name: data.firstName,
-        last_name: data.lastName,
+        first_name: data.first_name,
+        last_name: data.last_name,
         avatar: data.avatar,
       }).catch(() => {});
     }
@@ -336,9 +318,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ---------------------------------------------------- */
-/* Hook */
-/* ---------------------------------------------------- */
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
