@@ -34,7 +34,7 @@ const lessonTypeConfig: Record<LessonType, { icon: React.ComponentType<{ classNa
 const LessonPage = () => {
   const { moduleId, lessonId } = useParams<{ moduleId: string; lessonId: string }>();
   const navigate = useNavigate();
-  const { isLessonCompleted, completeLesson, uncompleteLesson, hasBadge } = useProgress();
+  const { isLessonCompleted, completeLesson, hasBadge } = useProgress();
   
   const module = getModuleById(moduleId || '');
   const lesson = getLessonById(moduleId || '', lessonId || '');
@@ -73,8 +73,7 @@ const LessonPage = () => {
 
   const handleToggleComplete = () => {
     if (completed) {
-      uncompleteLesson(module.id, lesson.id);
-      toast.info("Leçon marquée comme non terminée");
+      toast.info("Leçon déjà terminée");
     } else {
       completeLesson(module.id, lesson.id);
       const hadBadge = hasBadge(module.id);

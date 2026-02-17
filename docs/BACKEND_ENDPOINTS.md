@@ -10,12 +10,13 @@
 | Composant | Source de données | Fallback |
 |-----------|-------------------|----------|
 | `AuthContext` | `authService` → API | localStorage + mock-users |
-| `Home` / Modules | `useModules()` hook | `course-data.ts` local |
-| `AdminOverview` | `useAdminStats()` | Calcul depuis mock-users |
-| `AdminAnalytics` | `useAdminAnalytics()` | Données générées localement |
+| `Home` / Modules | `moduleService.getAll()` direct | Erreur console |
+| `ModulePage` | `course-data.ts` local | ❌ Pas d'API |
+| `AdminOverview` | `useAuth().users` + mock | ❌ Pas d'API |
+| `AdminAnalytics` | Données hardcodées | ❌ Pas d'API |
 | `AdminUsers` | `AuthContext.users` | localStorage |
-| `Quiz` | `useQuiz()` / `useSubmitQuiz()` | `quiz-data.ts` local |
-| `ML Predict` | `usePredict()` | Résultat simulé |
+| `QuizSystem` | `quiz-data.ts` local | ❌ Pas d'API |
+| `ML Predict` | Non connecté | ❌ Pas d'API |
 
 ---
 
@@ -34,10 +35,10 @@
 
 | Méthode | Endpoint | Frontend | Hook/Service | Statut |
 |---------|----------|----------|--------------|--------|
-| GET | `/api/users` | AdminUsers | `userService.getAll()` | ⚠️ Fallback localStorage |
+| GET | `/api/users` | AdminUsers | `userService.getAll()` | ⚠️ Service prêt, UI utilise localStorage |
 | GET | `/api/users/{id}` | — | `userService.getById()` | 🔧 Service prêt |
 | PUT | `/api/users/{id}` | AuthContext | `userService.update()` | ✅ Connecté (background) |
-| DELETE | `/api/users/{id}` | AdminUsers | `userService.delete()` | ✅ Connecté (background) |
+| DELETE | `/api/users/{id}` | AdminUsers | `userService.delete()` | 🔧 Service prêt |
 | GET | `/api/users/{id}/progression` | — | `userService.getProgression()` | 🔧 Service prêt |
 
 ---
@@ -46,8 +47,8 @@
 
 | Méthode | Endpoint | Frontend | Hook/Service | Statut |
 |---------|----------|----------|--------------|--------|
-| GET | `/api/modules` | Home | `useModules()` | ✅ Connecté (hybride) |
-| GET | `/api/modules/{id}` | ModulePage | `useModule(id)` | ✅ Connecté (hybride) |
+| GET | `/api/modules` | Home | `moduleService.getAll()` | ⚠️ Appelé directement (pas via hook RQ) |
+| GET | `/api/modules/{id}` | ModulePage | `useModule(id)` hook prêt | ❌ Page utilise `course-data.ts` local |
 | POST | `/api/modules` | AdminModules | `moduleService.create()` | 🔧 Service prêt |
 | PUT | `/api/modules/{id}` | AdminModules | `moduleService.update()` | 🔧 Service prêt |
 | DELETE | `/api/modules/{id}` | AdminModules | `moduleService.delete()` | 🔧 Service prêt |
@@ -59,7 +60,7 @@
 
 | Méthode | Endpoint | Frontend | Hook/Service | Statut |
 |---------|----------|----------|--------------|--------|
-| POST | `/api/lessons/{id}/complete` | LessonPage | `useCompleteLesson()` | ✅ Connecté (hybride) |
+| POST | `/api/lessons/{id}/complete` | LessonPage | `useCompleteLesson()` | 🔧 Hook prêt, non appelé dans UI |
 
 ---
 
@@ -67,8 +68,8 @@
 
 | Méthode | Endpoint | Frontend | Hook/Service | Statut |
 |---------|----------|----------|--------------|--------|
-| GET | `/api/quizzes/{id}` | QuizSystem | `useQuiz(id)` | ✅ Connecté (hybride) |
-| POST | `/api/quizzes/{id}/submit` | QuizSystem | `useSubmitQuiz()` | ✅ Connecté (hybride) |
+| GET | `/api/quizzes/{id}` | QuizSystem | `useQuiz(id)` | 🔧 Hook prêt, composant utilise props locales |
+| POST | `/api/quizzes/{id}/submit` | QuizSystem | `useSubmitQuiz()` | 🔧 Hook prêt, composant gère en local |
 | GET | `/api/quizzes/{id}/results/{attemptId}` | — | `quizService.getResults()` | 🔧 Service prêt |
 
 ---
@@ -86,9 +87,9 @@
 
 | Méthode | Endpoint | Frontend | Hook/Service | Statut |
 |---------|----------|----------|--------------|--------|
-| GET | `/api/admin/stats` | AdminOverview | `useAdminStats()` | ✅ Connecté (hybride) |
-| GET | `/api/admin/users` | AdminUsers | `adminService.getUsers()` | ⚠️ Fallback localStorage |
-| GET | `/api/admin/analytics` | AdminAnalytics | `useAdminAnalytics()` | ✅ Connecté (hybride) |
+| GET | `/api/admin/stats` | AdminOverview | `useAdminStats()` hook prêt | ❌ Page utilise mock local |
+| GET | `/api/admin/users` | AdminUsers | `adminService.getUsers()` | ❌ Page utilise AuthContext.users |
+| GET | `/api/admin/analytics` | AdminAnalytics | `useAdminAnalytics()` hook prêt | ❌ Page utilise données hardcodées |
 
 ---
 
@@ -96,7 +97,7 @@
 
 | Méthode | Endpoint | Frontend | Hook/Service | Statut |
 |---------|----------|----------|--------------|--------|
-| POST | `/api/ml/predict` | MLDashboard | `usePredict()` | ✅ Connecté (hybride) |
+| POST | `/api/ml/predict` | MLDashboard | `usePredict()` | 🔧 Hook prêt, non vérifié dans UI |
 
 ---
 
@@ -105,19 +106,20 @@
 | Icône | Signification |
 |-------|---------------|
 | ✅ | Connecté — appel API avec fallback automatique |
-| ⚠️ | Partiellement connecté — service prêt, données locales par défaut |
-| 🔧 | Service prêt — code écrit mais pas encore appelé dans l'UI |
-| ❌ | Non implémenté — endpoint backend existe mais aucun code frontend |
+| ⚠️ | Partiellement connecté — service appelé mais pas via hook React Query |
+| 🔧 | Service/Hook prêt — code écrit mais pas encore utilisé dans l'UI |
+| ❌ | Non connecté — page utilise données locales/mock |
 
 ---
 
-## 🚀 Fonctionnalités manquantes à implémenter
+## 🚀 Travail restant
 
-1. **`/api/progress/me`** et **`/api/progress/update`** : Créer un `progressService.ts` et un hook `useProgress` connecté à l'API.
-2. **CRUD Modules Admin** : Connecter `AdminModules` aux mutations `moduleService.create/update/delete`.
-3. **Page profil utilisateur** : Appeler `userService.update()` et `userService.getProgression()`.
-4. **Admin Users via API** : Remplacer `AuthContext.users` par `adminService.getUsers()` dans `AdminUsers`.
-5. **Résultats Quiz détaillés** : Utiliser `quizService.getResults()` pour afficher l'historique.
+1. **ModulePage** : Remplacer `getModuleById()` local par le hook `useModule(id)`
+2. **AdminOverview** : Remplacer mock par `useAdminStats()` + `useAdminAnalytics()`
+3. **AdminUsers** : Remplacer `AuthContext.users` par `adminService.getUsers()`
+4. **QuizSystem** : Intégrer `useQuiz()` et `useSubmitQuiz()` dans le composant
+5. **Progression** : Créer `progressService.ts` + hook + connecter DashboardPage
+6. **Home.tsx** : Migrer `moduleService.getAll()` direct vers hook `useModules()`
 
 ---
 
