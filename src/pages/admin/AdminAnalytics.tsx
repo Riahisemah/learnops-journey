@@ -1,23 +1,20 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
-import { modules } from "@/data/course-data";
-import { useAuth } from "@/contexts/AuthContext";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
+import { useAdminAnalytics, useAdminUsers, useModules } from "@/hooks/use-api";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 export default function AdminAnalytics() {
-  const { users } = useAuth();
-  const students = users.filter(u => u.role === "student");
+  const { data: users = [] } = useAdminUsers();
+  const { data: analytics } = useAdminAnalytics();
+  const { data: modules = [] } = useModules();
 
-  const moduleProgress = modules.map(m => ({
+  const students = users.filter((u: any) => u.role === "student");
+
+  const moduleProgress = analytics?.popular_modules?.map((m: any) => ({
     name: m.title.length > 15 ? m.title.slice(0, 15) + "…" : m.title,
-    progression: Math.floor(Math.random() * 40 + 40),
-  }));
-
-  const topUsers = [...students].sort((a, b) => b.progression - a.progression).slice(0, 10).map(u => ({
-    name: `${u.first_name} ${u.last_name[0]}.`,
-    progression: u.progression,
-  }));
+    views: m.views,
+  })) || [];
 
   const funnel = [
     { stage: "Inscrits", count: students.length },
@@ -42,14 +39,14 @@ export default function AdminAnalytics() {
 
       <div className="grid lg:grid-cols-2 gap-6">
         <Card>
-          <CardHeader><CardTitle className="text-base">Progression moyenne par module</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Modules populaires</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={moduleProgress}>
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip />
-                <Bar dataKey="progression" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="views" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -82,7 +79,7 @@ export default function AdminAnalytics() {
                   <div className="h-6 bg-muted rounded overflow-hidden">
                     <div
                       className="h-full bg-accent/70 rounded transition-all"
-                      style={{ width: `${(f.count / funnel[0].count) * 100}%` }}
+                      style={{ width: `${funnel[0].count > 0 ? (f.count / funnel[0].count) * 100 : 0}%` }}
                     />
                   </div>
                 </div>
@@ -92,19 +89,17 @@ export default function AdminAnalytics() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-base">Top 10 utilisateurs</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Utilisateurs récents</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {topUsers.map((u, i) => (
-                <div key={u.name} className="flex items-center gap-3 text-sm">
+              {users.slice(0, 10).map((u: any, i: number) => (
+                <div key={u.id} className="flex items-center gap-3 text-sm">
                   <span className="w-6 text-muted-foreground font-mono">#{i + 1}</span>
-                  <span className="flex-1">{u.name}</span>
-                  <div className="w-20 h-1.5 bg-muted rounded overflow-hidden">
-                    <div className="h-full bg-accent rounded" style={{ width: `${u.progression}%` }} />
-                  </div>
-                  <span className="w-10 text-right font-medium">{u.progression}%</span>
+                  <span className="flex-1">{u.first_name} {(u.last_name || '')[0]}.</span>
+                  <span className="text-xs text-muted-foreground">{u.role}</span>
                 </div>
               ))}
+              {users.length === 0 && <p className="text-sm text-muted-foreground">Aucun utilisateur</p>}
             </div>
           </CardContent>
         </Card>

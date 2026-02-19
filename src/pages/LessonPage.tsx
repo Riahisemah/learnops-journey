@@ -1,4 +1,5 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { 
   ArrowLeft, 
   ArrowRight,
@@ -8,14 +9,13 @@ import {
   Code,
   Clock,
   CheckCircle2,
-  Circle
+  Circle,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { getModuleById, getLessonById, LessonType, modules } from "@/data/course-data";
-import { getQuizByLesson } from "@/data/quiz-data";
-import { getVideoByLesson } from "@/data/video-data";
-import { getLessonContent } from "@/data/lesson-content";
+import { moduleService, type Module, type Lesson } from "@/services/moduleService";
+import { lessonService, type LessonContent } from "@/services/lessonService";
 import { useProgress } from "@/hooks/use-progress";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -23,6 +23,8 @@ import VideoPlayer from "@/components/lesson/VideoPlayer";
 import QuizSystem from "@/components/lesson/QuizSystem";
 import MarkdownViewer from "@/components/lesson/MarkdownViewer";
 import MLDashboard from "@/components/lesson/MLDashboard";
+
+type LessonType = 'video' | 'text' | 'quiz' | 'practice';
 
 const lessonTypeConfig: Record<LessonType, { icon: React.ComponentType<{ className?: string }>; label: string; color: string }> = {
   video: { icon: Video, label: 'Vidéo', color: 'text-info' },
@@ -36,9 +38,54 @@ const LessonPage = () => {
   const navigate = useNavigate();
   const { isLessonCompleted, completeLesson, hasBadge } = useProgress();
   
-  const module = getModuleById(moduleId || '');
-  const lesson = getLessonById(moduleId || '', lessonId || '');
-  
+  const [module, setModule] = useState<Module | null>(null);
+  const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [lessonContent, setLessonContent] = useState<LessonContent | null>(null);
+  const [allModules, setAllModules] = useState<Module[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!moduleId || !lessonId) return;
+      setIsLoading(true);
+      try {
+        const [moduleData, lessons, modules] = await Promise.all([
+          moduleService.getById(moduleId),
+          moduleService.getLessons(moduleId),
+          moduleService.getAll(),
+        ]);
+        setModule(moduleData);
+        setAllModules(modules);
+        const foundLesson = lessons.find(l => l.id === lessonId) || null;
+        setLesson(foundLesson);
+
+        // Try to fetch lesson content
+        try {
+          const content = await lessonService.getLessonContent(moduleId, lessonId);
+          setLessonContent(content);
+        } catch {
+          setLessonContent(null);
+        }
+      } catch (err) {
+        console.error('Error fetching lesson data:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, [moduleId, lessonId]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Chargement de la leçon...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!module || !lesson) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -53,22 +100,17 @@ const LessonPage = () => {
   }
 
   const completed = isLessonCompleted(module.id, lesson.id);
-  const typeConfig = lessonTypeConfig[lesson.type];
+  const typeConfig = lessonTypeConfig[lesson.type as LessonType] || lessonTypeConfig.text;
   const TypeIcon = typeConfig.icon;
   
-  // Content data
-  const quiz = getQuizByLesson(module.id, lesson.id);
-  const video = getVideoByLesson(module.id, lesson.id);
-  const lessonContent = getLessonContent(module.id, lesson.id);
-  
   // Navigation
-  const lessonIndex = module.lessons.findIndex(l => l.id === lesson.id);
-  const prevLesson = module.lessons[lessonIndex - 1];
-  const nextLesson = module.lessons[lessonIndex + 1];
-  const currentModuleIndex = modules.findIndex(m => m.id === module.id);
-  const nextModule = modules[currentModuleIndex + 1];
+  const lessons = module.lessons || [];
+  const lessonIndex = lessons.findIndex(l => l.id === lesson.id);
+  const prevLesson = lessons[lessonIndex - 1];
+  const nextLesson = lessons[lessonIndex + 1];
+  const currentModuleIndex = allModules.findIndex(m => m.id === module.id);
+  const nextModule = allModules[currentModuleIndex + 1];
 
-  // Check if this is the monitoring lesson (show ML dashboard)
   const showMLDashboard = lesson.id === 'monitoring' || lesson.id === 'project-recap';
 
   const handleToggleComplete = () => {
@@ -138,77 +180,48 @@ const LessonPage = () => {
           </div>
           
           <h1 className="text-2xl lg:text-3xl font-bold">{lesson.title}</h1>
-          <p className="text-muted-foreground mt-1">{lesson.description}</p>
+          {lesson.content && <p className="text-muted-foreground mt-1">{lesson.content}</p>}
         </div>
       </header>
 
       {/* Content */}
       <section className="py-8 px-6">
         <div className="max-w-4xl mx-auto">
-          {/* Video lessons */}
-          {lesson.type === 'video' && video && (
-            <VideoPlayer
-              video={video}
-              completed={completed}
-              onMarkWatched={handleToggleComplete}
-            />
-          )}
-
-          {/* Quiz lessons */}
-          {lesson.type === 'quiz' && quiz && (
-            <QuizSystem
-              quiz={quiz}
-              onComplete={handleQuizComplete}
-              completed={completed}
-            />
-          )}
-
-          {/* Text lessons with markdown viewer */}
-          {lesson.type === 'text' && lessonContent && (
+          {/* Text/Practice lessons with markdown viewer */}
+          {(lesson.type === 'text' || lesson.type === 'practice') && lessonContent && (
             <MarkdownViewer
               theory={lessonContent.theory}
               practice={lessonContent.practice}
             />
           )}
 
-          {/* Practice lessons */}
-          {lesson.type === 'practice' && (
-            <div className="space-y-6">
-              {lessonContent && (
-                <MarkdownViewer
-                  theory={lessonContent.theory}
-                  practice={lessonContent.practice}
-                />
-              )}
-              
-              {showMLDashboard && (
-                <MLDashboard />
-              )}
-
-              {!lessonContent && !showMLDashboard && (
-                <div className="text-center py-16 bg-card rounded-lg border border-border">
-                  <Code className={cn("h-16 w-16 mx-auto mb-4 opacity-50", typeConfig.color)} />
-                  <h2 className="text-xl font-semibold mb-2">Exercice pratique</h2>
-                  <p className="text-muted-foreground max-w-md mx-auto">
-                    Le contenu de cet exercice sera ajouté prochainement.
-                  </p>
-                </div>
-              )}
-            </div>
+          {/* Practice with ML Dashboard */}
+          {lesson.type === 'practice' && showMLDashboard && (
+            <MLDashboard />
           )}
 
           {/* Fallback for lessons without specific content */}
-          {lesson.type === 'video' && !video && (
+          {lesson.type === 'video' && (
             <div className="text-center py-16 bg-card rounded-lg border border-border">
               <Video className="h-16 w-16 mx-auto mb-4 opacity-50 text-info" />
-              <h2 className="text-xl font-semibold mb-2">Vidéo à venir</h2>
+              <h2 className="text-xl font-semibold mb-2">Vidéo</h2>
               <p className="text-muted-foreground max-w-md mx-auto">
-                La vidéo sera disponible prochainement.
+                {lesson.url ? 'Lecteur vidéo' : 'La vidéo sera disponible prochainement.'}
               </p>
             </div>
           )}
 
-          {lesson.type === 'text' && !lessonContent && (
+          {lesson.type === 'quiz' && (
+            <div className="text-center py-16 bg-card rounded-lg border border-border">
+              <HelpCircle className="h-16 w-16 mx-auto mb-4 opacity-50 text-warning" />
+              <h2 className="text-xl font-semibold mb-2">Quiz</h2>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Le quiz sera chargé depuis le backend.
+              </p>
+            </div>
+          )}
+
+          {(lesson.type === 'text' || lesson.type === 'practice') && !lessonContent && !showMLDashboard && (
             <div className="text-center py-16 bg-card rounded-lg border border-border">
               <FileText className="h-16 w-16 mx-auto mb-4 opacity-50 text-primary" />
               <h2 className="text-xl font-semibold mb-2">Contenu à venir</h2>
@@ -233,7 +246,7 @@ const LessonPage = () => {
                 {completed ? (
                   <>
                     <CheckCircle2 className="h-5 w-5 text-accent" />
-                    Terminée - Cliquer pour annuler
+                    Terminée
                   </>
                 ) : (
                   <>

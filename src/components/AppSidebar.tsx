@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { modules } from "@/data/course-data";
+import { useModules } from "@/hooks/use-api";
 import { useProgress } from "@/hooks/use-progress";
 import { useAuth } from "@/contexts/AuthContext";
 import { Progress } from "@/components/ui/progress";
@@ -27,6 +27,7 @@ function SidebarContentInner({ onNavigate }: SidebarContentProps) {
   const location = useLocation();
   const { getModuleProgress, getOverallProgress, getBadgesCount, getCompletedLessonsCount } = useProgress();
   const { user, logout } = useAuth();
+  const { data: modules = [] } = useModules();
   const [showLogout, setShowLogout] = useState(false);
 
   return (
@@ -56,7 +57,7 @@ function SidebarContentInner({ onNavigate }: SidebarContentProps) {
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">Modules</span>
         </div>
 
-        {modules.map((module) => {
+        {modules.map((module: any) => {
           const IconComponent = iconMap[module.icon] || BookOpen;
           const progress = getModuleProgress(module.id);
           const isActive = location.pathname.includes(`/module/${module.id}`);
@@ -88,7 +89,7 @@ function SidebarContentInner({ onNavigate }: SidebarContentProps) {
         <div className="flex items-center justify-between pt-2">
           <div className="flex items-center gap-2 text-sm">
             <Trophy className="h-4 w-4 text-warning" />
-            <span>{getBadgesCount()}/4 badges</span>
+            <span>{getBadgesCount()} badges</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <BookOpen className="h-4 w-4" />

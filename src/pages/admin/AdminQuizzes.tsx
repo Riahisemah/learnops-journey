@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Plus, Edit2, Trash2, HelpCircle, X } from "lucide-react";
-import { modules } from "@/data/course-data";
+import { useModules } from "@/hooks/use-api";
 import { toast } from "sonner";
 
 interface QuizQuestion {
@@ -30,24 +30,26 @@ interface QuizItem {
   attempts: number;
 }
 
-const initialQuizzes: QuizItem[] = modules
-  .flatMap(m => m.lessons.filter(l => l.type === "quiz").map(l => ({
-    id: l.id,
-    title: l.title,
-    module: m.title,
-    questions: [
-      { question: "Question exemple 1", type: "single" as const, options: ["Option A", "Option B", "Option C", "Option D"], correctIndices: [0], explanation: "Explication de la réponse" },
-      { question: "Question exemple 2", type: "multiple" as const, options: ["Option A", "Option B", "Option C"], correctIndices: [0, 2], explanation: "" },
-    ],
-    avgScore: Math.floor(Math.random() * 30 + 65),
-    attempts: Math.floor(Math.random() * 100 + 20),
-  })));
-
 const emptyQuestion = (): QuizQuestion => ({ question: "", type: "single", options: ["", "", "", ""], correctIndices: [0], explanation: "" });
 
-const moduleOptions = modules.map(m => m.title);
-
 export default function AdminQuizzes() {
+  const { data: modules = [] } = useModules();
+  
+  const moduleOptions = modules.map((m: any) => m.title);
+
+  // Build initial quizzes from API modules
+  const initialQuizzes: QuizItem[] = modules
+    .flatMap((m: any) => (m.lessons || []).filter((l: any) => l.type === "quiz").map((l: any) => ({
+      id: l.id,
+      title: l.title,
+      module: m.title,
+      questions: [
+        { question: "Question exemple 1", type: "single" as const, options: ["Option A", "Option B", "Option C", "Option D"], correctIndices: [0], explanation: "Explication de la réponse" },
+      ],
+      avgScore: 0,
+      attempts: 0,
+    })));
+
   const [quizzes, setQuizzes] = useState<QuizItem[]>(initialQuizzes);
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<QuizItem | null>(null);
@@ -178,7 +180,7 @@ export default function AdminQuizzes() {
                 <Label>Module</Label>
                 <Select value={module_} onValueChange={setModule}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{moduleOptions.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                  <SelectContent>{moduleOptions.map((m: string) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </div>
@@ -221,16 +223,8 @@ export default function AdminQuizzes() {
                       <Label className="text-xs">Réponses (cocher les correctes)</Label>
                       {q.options.map((opt, oIdx) => (
                         <div key={oIdx} className="flex items-center gap-2">
-                          <Checkbox
-                            checked={q.correctIndices.includes(oIdx)}
-                            onCheckedChange={() => toggleCorrect(qIdx, oIdx)}
-                          />
-                          <Input
-                            value={opt}
-                            onChange={e => updateOption(qIdx, oIdx, e.target.value)}
-                            placeholder={`Option ${oIdx + 1}`}
-                            className="h-8 text-sm flex-1"
-                          />
+                          <Checkbox checked={q.correctIndices.includes(oIdx)} onCheckedChange={() => toggleCorrect(qIdx, oIdx)} />
+                          <Input value={opt} onChange={e => updateOption(qIdx, oIdx, e.target.value)} placeholder={`Option ${oIdx + 1}`} className="h-8 text-sm flex-1" />
                           {q.options.length > 2 && (
                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeOption(qIdx, oIdx)}>
                               <X className="h-3 w-3" />
