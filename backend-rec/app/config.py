@@ -1,10 +1,9 @@
 from pydantic_settings import BaseSettings
-from pydantic import ConfigDict
 from typing import Optional
 
 class Settings(BaseSettings):
     # Database
-    DATABASE_URL: str = "postgresql://devops_user:devops_password@localhost:5432/didacticiel_db"
+    DATABASE_URL: str 
     
     # Security
     SECRET_KEY: str = "your-secret-key-change-in-production"
@@ -18,21 +17,15 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
     
-    # MLflow (add this if you're using MLflow)
-    MLFLOW_TRACKING_URI: str = "http://localhost:5000"
-    
     # Email (Optional)
     SMTP_HOST: Optional[str] = None
     SMTP_PORT: Optional[int] = None
     SMTP_USER: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
-    
-    # Use model_config instead of class Config for Pydantic v2
-    model_config = ConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=True,
-        extra="forbid"  # This will reject undefined environment variables
-    )
+    MLFLOW_TRACKING_URI: str | None = None
+
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
 
 settings = Settings()
