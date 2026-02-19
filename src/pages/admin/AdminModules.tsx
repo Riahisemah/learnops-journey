@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { modules as courseModules, type Module, type Lesson } from "@/data/course-data";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,8 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { BookOpen, Clock, Users, Copy, Trash2, Edit2, GripVertical, Plus, X } from "lucide-react";
+import { BookOpen, Clock, Copy, Trash2, Edit2, GripVertical, Plus, X } from "lucide-react";
 import { toast } from "sonner";
+import { useModules } from "@/hooks/use-api";
+import { moduleService, type Module } from "@/services/moduleService";
 
 interface ModuleFormData {
   title: string;
@@ -22,7 +23,7 @@ const emptyLesson = () => ({ title: "", type: "text", duration: 15, description:
 const emptyModule = (): ModuleFormData => ({ title: "", description: "", week: 1, lessons: [emptyLesson()] });
 
 export default function AdminModules() {
-  const [localModules, setLocalModules] = useState(courseModules);
+  const { data: modules = [], refetch } = useModules();
   const [formOpen, setFormOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Module | null>(null);
@@ -35,67 +36,50 @@ export default function AdminModules() {
       title: m.title,
       description: m.description,
       week: m.week,
-      lessons: m.lessons.map(l => ({ title: l.title, type: l.type, duration: l.duration, description: l.description })),
+      lessons: (m.lessons || []).map(l => ({ title: l.title, type: l.type, duration: parseInt(l.duration) || 15, description: l.content || '' })),
     });
     setEditId(m.id);
     setFormOpen(true);
   };
 
-  const handleDuplicate = (m: Module) => {
-    const dup: Module = {
-      ...m,
-      id: `${m.id}-copy-${Date.now()}`,
-      title: `${m.title} (copie)`,
-      lessons: m.lessons.map(l => ({ ...l, id: `${l.id}-copy-${Date.now()}` })),
-    };
-    setLocalModules(prev => [...prev, dup]);
-    toast.success("Module dupliqué");
-  };
-
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteTarget) return;
-    setLocalModules(prev => prev.filter(m => m.id !== deleteTarget.id));
+    try {
+      await moduleService.delete(deleteTarget.id);
+      refetch();
+      toast.success("Module supprimé");
+    } catch {
+      toast.error("Erreur lors de la suppression");
+    }
     setDeleteTarget(null);
-    toast.success("Module supprimé");
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.title || !form.description) {
       toast.error("Titre et description requis");
       return;
     }
-    if (editId) {
-      setLocalModules(prev => prev.map(m => m.id === editId ? {
-        ...m,
-        title: form.title,
-        description: form.description,
-        week: form.week,
-        lessons: form.lessons.map((l, i) => ({
-          id: m.lessons[i]?.id || `lesson-${Date.now()}-${i}`,
-          title: l.title,
-          type: l.type as Lesson["type"],
-          duration: l.duration,
-          description: l.description,
-        })),
-      } : m));
-      toast.success("Module modifié");
-    } else {
-      const newModule: Module = {
-        id: `module-${Date.now()}`,
-        title: form.title,
-        description: form.description,
-        week: form.week,
-        icon: "BookOpen",
-        lessons: form.lessons.map((l, i) => ({
-          id: `lesson-${Date.now()}-${i}`,
-          title: l.title,
-          type: l.type as Lesson["type"],
-          duration: l.duration,
-          description: l.description,
-        })),
-      };
-      setLocalModules(prev => [...prev, newModule]);
-      toast.success("Module créé");
+    try {
+      if (editId) {
+        await moduleService.update(editId, {
+          title: form.title,
+          description: form.description,
+          week: form.week,
+          order: form.week,
+        });
+        toast.success("Module modifié");
+      } else {
+        await moduleService.create({
+          title: form.title,
+          description: form.description,
+          week: form.week,
+          order: form.week,
+        });
+        toast.success("Module créé");
+      }
+      refetch();
+    } catch {
+      toast.error("Erreur lors de la sauvegarde");
     }
     setFormOpen(false);
   };
@@ -118,8 +102,8 @@ export default function AdminModules() {
       </div>
 
       <div className="grid gap-4">
-        {localModules.map(m => {
-          const totalMin = m.lessons.reduce((a, l) => a + l.duration, 0);
+        {modules.map((m: Module) => {
+          const totalMin = (m.lessons || []).reduce((a, l) => a + (parseInt(l.duration) || 0), 0);
           return (
             <Card key={m.id} className="group hover:shadow-md transition-shadow">
               <CardContent className="p-5">
@@ -133,13 +117,12 @@ export default function AdminModules() {
                     <h3 className="font-semibold text-lg">{m.title}</h3>
                     <p className="text-sm text-muted-foreground mt-1">{m.description}</p>
                     <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" />{m.lessons.length} leçons</span>
+                      <span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" />{(m.lessons || []).length} leçons</span>
                       <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{totalMin} min</span>
                     </div>
                   </div>
                   <div className="flex gap-1">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(m)}><Edit2 className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDuplicate(m)}><Copy className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteTarget(m)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </div>

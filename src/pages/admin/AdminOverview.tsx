@@ -1,55 +1,45 @@
 import { Users, BookOpen, CheckCircle2, Star, TrendingUp, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/contexts/AuthContext";
-import { modules } from "@/data/course-data";
+import { useAdminStats, useAdminAnalytics, useModules } from "@/hooks/use-api";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 
 export default function AdminOverview() {
-  const { users } = useAuth();
-  const students = users.filter(u => u.role === "student");
-  const instructors = users.filter(u => u.role === "instructor");
-  const admins = users.filter(u => u.role === "admin");
-  const avgProg = Math.round(students.reduce((a, s) => a + s.progression, 0) / (students.length || 1));
-  const completions = students.filter(s => s.progression === 100).length;
-  const completionRate = Math.round((completions / (students.length || 1)) * 100);
+  const { data: stats } = useAdminStats();
+  const { data: analytics } = useAdminAnalytics();
+  const { data: modules = [] } = useModules();
 
-  const roleData = [
-    { name: "Étudiants", value: students.length, fill: "hsl(var(--accent))" },
-    { name: "Formateurs", value: instructors.length, fill: "hsl(var(--info))" },
-    { name: "Admins", value: admins.length, fill: "hsl(var(--warning))" },
-  ];
+  const roleData = analytics?.user_roles?.map(r => ({
+    name: r.role === "student" ? "Étudiants" : r.role === "instructor" ? "Formateurs" : "Admins",
+    value: r.count,
+    fill: r.role === "student" ? "hsl(var(--accent))" : r.role === "instructor" ? "hsl(var(--info))" : "hsl(var(--warning))",
+  })) || [];
 
-  const moduleData = modules.map(m => ({
+  const moduleData = analytics?.popular_modules?.map(m => ({
     name: m.title.length > 12 ? m.title.slice(0, 12) + "…" : m.title,
-    students: Math.floor(Math.random() * students.length) + 1,
-  }));
+    views: m.views,
+  })) || [];
 
-  const last7Days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    return { day: d.toLocaleDateString("fr-FR", { weekday: "short" }), inscriptions: Math.floor(Math.random() * 5) + 1 };
-  });
+  const registrationData = analytics?.registrations_per_day?.map(d => ({
+    day: new Date(d.date).toLocaleDateString("fr-FR", { weekday: "short" }),
+    inscriptions: d.count,
+  })) || [];
 
-  const recentActivity = [
-    { text: "Sophie L. a complété le Module 3", time: "Il y a 5min" },
-    { text: "Nouveau quiz ajouté par Admin", time: "Il y a 1h" },
-    { text: "Jean M. s'est inscrit", time: "Il y a 2h" },
-    { text: "Marie D. a obtenu le badge quiz-master", time: "Il y a 3h" },
-    { text: "Lucas R. a commencé le Module 2", time: "Il y a 5h" },
-  ];
+  const recentActivity = analytics?.recent_activity?.map(a => ({
+    text: `${a.user} ${a.action}`,
+    time: new Date(a.timestamp).toLocaleString("fr-FR"),
+  })) || [];
 
   const kpis = [
-    { label: "Utilisateurs", value: users.length.toLocaleString(), sub: `+${Math.floor(Math.random() * 15 + 5)}% ce mois`, icon: Users, color: "text-accent" },
-    { label: "Modules", value: modules.length, sub: "Actifs: 100%", icon: BookOpen, color: "text-info" },
-    { label: "Complétions", value: completions, sub: `${completionRate}% taux`, icon: CheckCircle2, color: "text-success" },
-    { label: "Progression moy.", value: `${avgProg}%`, sub: "+3% ce mois", icon: TrendingUp, color: "text-warning" },
+    { label: "Utilisateurs", value: stats?.total_users ?? 0, sub: `+${stats?.users_growth ?? 0}% ce mois`, icon: Users, color: "text-accent" },
+    { label: "Modules", value: stats?.total_modules ?? modules.length, sub: "Actifs: 100%", icon: BookOpen, color: "text-info" },
+    { label: "Complétions", value: stats?.total_completions ?? 0, sub: `${stats?.completions_rate ?? 0}% taux`, icon: CheckCircle2, color: "text-success" },
+    { label: "Note moyenne", value: stats?.average_rating ?? 0, sub: "sur 5", icon: TrendingUp, color: "text-warning" },
   ];
 
   return (
     <div className="p-6 space-y-6 animate-fade-in max-w-7xl mx-auto">
       <h1 className="text-2xl font-bold">Vue d'ensemble</h1>
 
-      {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {kpis.map(k => (
           <Card key={k.label}>
@@ -65,13 +55,12 @@ export default function AdminOverview() {
         ))}
       </div>
 
-      {/* Charts row */}
       <div className="grid lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader><CardTitle className="text-base">Inscriptions (7 jours)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={last7Days}>
+              <LineChart data={registrationData}>
                 <XAxis dataKey="day" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip />
@@ -89,7 +78,7 @@ export default function AdminOverview() {
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip />
-                <Bar dataKey="students" fill="hsl(var(--info))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="views" fill="hsl(var(--info))" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -97,7 +86,6 @@ export default function AdminOverview() {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Pie chart */}
         <Card>
           <CardHeader><CardTitle className="text-base">Répartition par rôle</CardTitle></CardHeader>
           <CardContent className="flex items-center justify-center">
@@ -112,11 +100,11 @@ export default function AdminOverview() {
           </CardContent>
         </Card>
 
-        {/* Recent activity */}
         <Card>
           <CardHeader><CardTitle className="text-base">Activité récente</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-3">
+              {recentActivity.length === 0 && <p className="text-sm text-muted-foreground">Aucune activité récente</p>}
               {recentActivity.map((a, i) => (
                 <div key={i} className="flex items-start gap-3">
                   <div className="mt-1.5 h-2 w-2 rounded-full bg-accent flex-shrink-0" />

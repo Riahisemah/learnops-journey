@@ -15,9 +15,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useProgress } from "@/hooks/use-progress";
+import { useModules } from "@/hooks/use-api";
 import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
-import { moduleService } from "@/services/moduleService";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   GitBranch,
@@ -35,27 +34,10 @@ const Home = () => {
     hasBadge
   } = useProgress();
 
-  const [modules, setModules] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: modules = [], isLoading } = useModules();
 
-  useEffect(() => {
-    const fetchModules = async () => {
-      try {
-        const data = await moduleService.getAll();
-        setModules(data);
-      } catch (error) {
-        console.error('Error fetching modules:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchModules();
-  }, []);
-
-  // Calculer les totaux à partir des modules
-  const totalLessons = modules.reduce((acc, module) => acc + (module.lessons?.length || 0), 0);
-  const totalMinutes = modules.reduce((acc, module) => acc + (module.total_duration || 0), 0);
+  const totalLessons = modules.reduce((acc: number, module: any) => acc + (module.lessons?.length || 0), 0);
+  const totalMinutes = modules.reduce((acc: number, module: any) => acc + (module.total_duration || 0), 0);
   const totalHours = Math.floor(totalMinutes / 60);
 
   if (isLoading) {
@@ -91,7 +73,7 @@ const Home = () => {
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
             <Button asChild size="lg" className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-              <Link to="/module/devops-basics">
+              <Link to={modules.length > 0 ? `/module/${modules[0].id}` : "/"}>
                 Commencer le parcours
                 <ArrowRight className="h-4 w-4" />
               </Link>
@@ -146,14 +128,14 @@ const Home = () => {
       <section className="py-16 px-6">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
-            <h2 className="text-2xl lg:text-3xl font-bold mb-3">Parcours en 4 semaines</h2>
+            <h2 className="text-2xl lg:text-3xl font-bold mb-3">Parcours en {modules.length} semaines</h2>
             <p className="text-muted-foreground">
               Un programme structuré pour maîtriser DevOps et MLOps
             </p>
           </div>
 
           <div className="space-y-6">
-            {modules.map((module, index) => {
+            {modules.map((module: any, index: number) => {
               const IconComponent = iconMap[module.icon] || BookOpen;
               const progress = getModuleProgress(module.id);
               const hasBadgeForModule = hasBadge(module.id);
@@ -203,7 +185,7 @@ const Home = () => {
                         <div className="flex-shrink-0 text-right">
                           <div className="text-2xl font-bold text-primary">{progress}%</div>
                           <div className="text-xs text-muted-foreground">
-                            {module.lessons.length} leçons
+                            {module.lessons?.length || 0} leçons
                           </div>
                         </div>
                       </div>
