@@ -49,9 +49,6 @@ const CodeBlock = ({ language, code }: { language: string; code: string }) => {
 };
 
 const RenderContent = ({ section, searchQuery }: { section: ContentSection; searchQuery: string }) => {
-  // Ensure section exists with default values
-  const safeSection = section || { title: '', content: '', codeBlocks: [] };
-  
   const highlightText = (text: string) => {
     if (!searchQuery) return text;
     const regex = new RegExp(`(${searchQuery})`, 'gi');
@@ -66,9 +63,9 @@ const RenderContent = ({ section, searchQuery }: { section: ContentSection; sear
   return (
     <div className="prose-sm max-w-none space-y-4">
       <div className="text-foreground leading-relaxed whitespace-pre-line">
-        {highlightText(safeSection.content || 'Aucun contenu disponible.')}
+        {highlightText(section.content)}
       </div>
-      {safeSection.codeBlocks?.map((block, i) => (
+      {section.codeBlocks?.map((block, i) => (
         <CodeBlock key={i} language={block.language} code={block.code} />
       ))}
     </div>
@@ -77,19 +74,6 @@ const RenderContent = ({ section, searchQuery }: { section: ContentSection; sear
 
 const MarkdownViewer = ({ theory, practice }: MarkdownViewerProps) => {
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Create safe defaults with fallbacks
-  const safeTheory = {
-    title: theory?.title || 'Théorie',
-    content: theory?.content || 'Aucun contenu théorique disponible pour cette leçon.',
-    codeBlocks: theory?.codeBlocks || []
-  };
-
-  const safePractice = {
-    title: practice?.title || 'Pratique',
-    content: practice?.content || 'Aucun exercice pratique disponible pour cette leçon.',
-    codeBlocks: practice?.codeBlocks || []
-  };
 
   return (
     <div className="space-y-4">
@@ -120,8 +104,8 @@ const MarkdownViewer = ({ theory, practice }: MarkdownViewerProps) => {
         <TabsContent value="theory">
           <Card>
             <CardContent className="p-6">
-              <h2 className="text-xl font-bold mb-4">{safeTheory.title}</h2>
-              <RenderContent section={safeTheory} searchQuery={searchQuery} />
+              <h2 className="text-xl font-bold mb-4">{theory.title}</h2>
+              <RenderContent section={theory} searchQuery={searchQuery} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -129,8 +113,8 @@ const MarkdownViewer = ({ theory, practice }: MarkdownViewerProps) => {
         <TabsContent value="practice">
           <Card>
             <CardContent className="p-6">
-              <h2 className="text-xl font-bold mb-4">{safePractice.title}</h2>
-              <RenderContent section={safePractice} searchQuery={searchQuery} />
+              <h2 className="text-xl font-bold mb-4">{practice.title}</h2>
+              <RenderContent section={practice} searchQuery={searchQuery} />
             </CardContent>
           </Card>
         </TabsContent>
