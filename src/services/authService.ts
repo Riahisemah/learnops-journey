@@ -44,7 +44,7 @@ export const authService = {
     formData.append('password', credentials.password);
 
     const response = await httpClient.post<AuthResponse>(
-      API_CONFIG.ENDPOINTS.AUTH.LOGIN,
+      API_CONFIG.ENDPOINTS.AUTH.LOGIN,  
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     );
