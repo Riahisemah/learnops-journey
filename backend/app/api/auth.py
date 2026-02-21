@@ -5,7 +5,7 @@ from datetime import datetime
 import uuid
 
 from app.database import get_db
-from app.schemas.user import UserCreate, UserResponse, Token
+from app.schemas.user import UserCreate, UserResponse, Token, ForgotPasswordRequest
 from app.models.user import User
 from app.models.progression import UserProgression
 from app.core.security import get_password_hash, verify_password, create_access_token
@@ -97,7 +97,7 @@ async def get_me(current_user: User = Depends(get_current_active_user)):
     return current_user
 
 @router.post("/forgot-password")
-async def forgot_password(email: str, db: Session = Depends(get_db)):
-    """POST /api/auth/forgot-password - Demander une réinitialisation"""
-    # Toujours retourner succès pour la sécurité
-    return {"message": "Password reset email sent"}
+async def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """POST /api/auth/forgot-password - Demander une réinitialisation (body: { email })"""
+    # Always return success for security (no email enumeration)
+    return {"message": "If an account exists for this email, a password reset link has been sent."}

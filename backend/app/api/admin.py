@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -8,6 +7,7 @@ from app.database import get_db
 from app.schemas.admin import AdminStats, Analytics, RegistrationData, PopularModule, UserRoleCount, RecentActivity
 from app.models.user import User
 from app.models.module import Module
+from app.models.lesson import Lesson
 from app.models.progression import UserProgression, LessonCompletion
 from app.api.deps import require_admin
 
@@ -106,16 +106,19 @@ async def get_analytics(
 ):
     """GET /api/admin/analytics - Données analytiques détaillées"""
     
-    # Registrations per day (7 derniers jours)
+    # Registrations per day (last 7 days, portable date filter)
     registrations = []
     for i in range(7):
-        date = datetime.utcnow() - timedelta(days=i)
+        day = (datetime.utcnow() - timedelta(days=i)).date()
+        start = datetime.combine(day, datetime.min.time())
+        end = start + timedelta(days=1)
         count = db.query(User).filter(
-            func.date(User.created_at) == date.date()
+            User.created_at >= start,
+            User.created_at < end,
         ).count()
         registrations.append(RegistrationData(
-            date=date.strftime("%Y-%m-%d"),
-            count=count
+            date=day.strftime("%Y-%m-%d"),
+            count=count,
         ))
     
     # Popular modules (simulé avec nombre de leçons complétées)
@@ -142,20 +145,42 @@ async def get_analytics(
         count = db.query(User).filter(User.role == role).count()
         user_roles.append(UserRoleCount(role=role, count=count))
     
-    # Recent activity (simulé)
-    recent_activity = [
-        RecentActivity(
-            user="Marie D.",
-            action="completed Module 2",
-            timestamp=datetime.utcnow().isoformat()
-        ),
-        RecentActivity(
-            user="Jean M.",
-            action="registered",
-            timestamp=(datetime.utcnow() - timedelta(hours=2)).isoformat()
+    # Recent activity: real data from lesson completions and new registrations
+    recent_activity = []
+    completions = (
+        db.query(LessonCompletion, User, Lesson)
+        .join(User, LessonCompletion.user_id == User.id)
+        .join(Lesson, LessonCompletion.lesson_id == Lesson.id)
+        .order_by(LessonCompletion.created_at.desc())
+        .limit(8)
+        .all()
+    )
+    for lc, u, lesson in completions:
+        ts = getattr(lc, "created_at", None) or datetime.utcnow()
+        recent_activity.append(
+            RecentActivity(
+                user=f"{u.first_name} {u.last_name}".strip() or u.email,
+                action=f"completed {lesson.title}",
+                timestamp=ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
+            )
         )
-    ]
-    
+    new_users = (
+        db.query(User)
+        .order_by(User.created_at.desc())
+        .limit(5)
+        .all()
+    )
+    for u in new_users:
+        recent_activity.append(
+            RecentActivity(
+                user=f"{u.first_name} {u.last_name}".strip() or u.email,
+                action="registered",
+                timestamp=u.created_at.isoformat() if u.created_at else datetime.utcnow().isoformat(),
+            )
+        )
+    recent_activity.sort(key=lambda x: x.timestamp, reverse=True)
+    recent_activity = recent_activity[:10]
+
     return Analytics(
         registrations_per_day=registrations,
         popular_modules=popular_modules[:5],  # Top 5

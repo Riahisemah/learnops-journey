@@ -9,7 +9,8 @@ class LessonResponse(BaseModel):
     completed: bool
     url: Optional[str] = None
     content: Optional[str] = None
-    
+    description: Optional[str] = None
+
     class Config:
         from_attributes = True
 
@@ -22,7 +23,8 @@ class ModuleResponse(BaseModel):
     lessons: List[LessonResponse]
     completion_rate: int
     total_duration: int
-    
+    icon: Optional[str] = None
+
     class Config:
         from_attributes = True
 

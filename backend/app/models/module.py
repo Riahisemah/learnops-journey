@@ -11,7 +11,8 @@ class Module(Base):
     week = Column(Integer, nullable=False)
     order = Column(Integer, nullable=False)
     total_duration = Column(Integer, default=0)  # en minutes
-    
+    icon = Column(String, nullable=True)  # optional, e.g. GitBranch, Brain, Rocket, Award for frontend Home
+
     # Relations
     lessons = relationship("Lesson", back_populates="module", cascade="all, delete-orphan")
     quizzes = relationship("Quiz", back_populates="module", cascade="all, delete-orphan")

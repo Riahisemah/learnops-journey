@@ -10,6 +10,7 @@ from app.api.deps import get_current_active_user
 
 router = APIRouter(prefix="/api/lessons", tags=["Lessons"])
 
+
 @router.post("/{lesson_id}/complete", status_code=status.HTTP_200_OK)
 async def complete_lesson(
     lesson_id: str,
@@ -44,3 +45,17 @@ async def complete_lesson(
     db.commit()
     
     return {"message": "Lesson marked as complete"}
+
+
+@router.get("/{lesson_id}/status")
+async def get_lesson_status(
+    lesson_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """GET /api/lessons/{lesson_id}/status - Check if lesson is completed for current user"""
+    existing = db.query(LessonCompletion).filter(
+        LessonCompletion.user_id == current_user.id,
+        LessonCompletion.lesson_id == lesson_id
+    ).first()
+    return {"completed": existing is not None}

@@ -1,6 +1,7 @@
-from sqlalchemy import Column, String, Integer, ForeignKey, JSON
+from sqlalchemy import Column, String, Integer, ForeignKey, JSON, DateTime
 from sqlalchemy.orm import relationship
 from app.database import Base
+from datetime import datetime
 import uuid
 
 class UserProgression(Base):
@@ -32,6 +33,7 @@ class LessonCompletion(Base):
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"))
     lesson_id = Column(String, ForeignKey("lessons.id", ondelete="CASCADE"))
     completed = Column(Integer, default=1)  # SQLite Boolean (0/1)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Relations
     lesson = relationship("Lesson", back_populates="completions")

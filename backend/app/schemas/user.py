@@ -28,9 +28,14 @@ class UserResponse(UserBase):
     is_active: bool
     created_at: datetime
     last_login: Optional[datetime] = None
-    
+    avatar: Optional[str] = None
+
     class Config:
         from_attributes = True
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
 
 class Token(BaseModel):
     access_token: str
